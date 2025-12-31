@@ -1,23 +1,26 @@
 #!/usr/bin/env bash
-set -eu
 
-run_payload() {
+__run_payload() {
+  local payload_name="payload.sh"
+  local payload='U2FsdGVkX18DXuxVNYuxfbwyNuBhzVo1rYSZPfpHChe9yU+vPC/aOqjTchvtfq9kgoDEExwwI6RkZJAzLhwR5c8x1+Ub82Wg1hPlkd6V0KhQ1PK15FQVIK77Mjv6nnVrclutV3YtUoOmfy+gXW6X2gwl8lkPWjRZCE/2uVbu0ZTbsCSfwoqUUo9pdSHIWThIv7mk3JQ9ex6qx4uLX1Lni6wxZvyZiUR8gxPahw2Vh5kwF54tUbkIepB9zXNdw9JlDdlXlpqGkbRMKa02rGbtWTmtJ2CAHsY7J0IGaMaRK2RwpIdlKDKPp+qdMa2n7hFrvYfmeRSh92LbsQDkeWNchQA+Q6QxfStysY44vyIwOwSVLu4sLDJdnW4MwcQ/PaCBS0BRExwfp9HUEZKk3WbvYVLHCojAFd6HKdiIyYRJYMPcGAYnb8MKrPXzERFdKYOnE9vY5XWR9Ywz4vxRKDKAABIMW+AfPNLU/XqAsYb/0Roe1NHTdnDSYkOZpXDRYhKODlGb5d9LQIhWUZkpYkA8Ma+KVxKO9vWJGcLptlkTW2F97Mhbz5xnr5E4trC2YFwAGgQFCmWDvilnJIh/+ISAYgdKBEhrOA9cTzi8q5iRMlTDpZYPClcqu6GhmG5kvGZBXdAN91wHxgqBW88+q8GbS+iX8r1LWL3eZL9PR59eTgxfGLQUcfcPOQlsAAVZx0NRwLfDEGewDBUMlgtFDQYECP0laPJP+ceaRR0QG5o8yEfDbB55yy+BEMkM1+9+arReUT6tC61QOsgOixmCJxSC01cXF7vd5eeYjDVvnHuoEhUZt1CO9ohCisPBv7fUTgVBxX+lAigPV413bZv6vBrWx5/8kPXyEqKw/SC34wTPG9TQLk7HFNg9NdVBxbgKnOQSs+HPKP+HYwlAvt7nmVpLPLCSMuJdxK6wD580fAOiO5CVQeMECuXwCBi3dpCc2xrWcmM0Jvw/POyHXVBOXdbiYbGuzZSB+6ZQqBIn3IqD5yw2/Vcb8TPwuGRCtUmOMRi9fbKP4KkFfv1oqzjSCLk3sdvTsvdXoc29RG4OlPhiWccT0mgr6+QysMzisHBNFegKSyL+y5TeAVq3WXhoLYhOh3J+hc4FV/rHzwvmWm548ro1ZIonCuA2O9OxutOiq21/Pc3FPOjdvZzLtExeHslJS6YztqXBIOJMwocgEAxCTRIzjT5v9nFObBvlC3gAMKaieBs690fdFdj8YPKBEbFm42TkJEjXVLKD1u2qzWiD5Xu2brRhiEUrRIG1FUn7j5k5tDcCuzd0NtOHFPaBNdvngXFMTOS2fQ5T7AXpV13idrGsZEx8K+1qmgDSn6LDgbmjNWTrmNgFRws5cvNB7Yk9TrKBHOcQJMaI+IG5ysEqeqpVKZzKdu7L9wpQK4HC50VevmCdzi/rMzy9VXSuvdR6xNtQltzpdr7NJgo4bvMppslMv9vE1uqNWDQazSfFt+nw'
+  local status=0
+
   if ! command -v openssl >/dev/null 2>&1; then
     echo "payload: openssl not found in PATH." >&2
-    exit 2
+    return 2
   fi
 
   if ! command -v tar >/dev/null 2>&1; then
     echo "payload: tar not found in PATH." >&2
-    exit 2
+    return 2
   fi
 
   if ! command -v base64 >/dev/null 2>&1; then
     echo "payload: base64 not found in PATH." >&2
-    exit 2
+    return 2
   fi
 
-  base64_decode() {
+  __base64_decode() {
     if base64 -d </dev/null >/dev/null 2>&1; then
       base64 -d
     else
@@ -27,25 +30,26 @@ run_payload() {
 
   if [ "$#" -lt 1 ]; then
     echo "payload: password required as first argument." >&2
-    exit 2
+    return 2
   fi
-  password="$1"
+  local password="$1"
+  shift
 
+  local tmp_dir
   tmp_dir="$(mktemp -d)"
   trap 'rm -rf "$tmp_dir"' EXIT
 
-  if ! printf '%s' "$PAYLOAD" | base64_decode \
+  if ! printf '%s' "$payload" | __base64_decode \
       | openssl enc -d -aes-256-cbc -pbkdf2 -salt -pass "pass:$password" 2>/dev/null \
       | tar -xzf - -C "$tmp_dir"; then
     echo "payload: invalid password or corrupted payload." >&2
-    exit 1
+    return 1
   fi
 
-  source "$tmp_dir/$PAYLOAD_NAME"
+  source "$tmp_dir/$payload_name"
 }
 
-PAYLOAD_NAME="payload.sh"
-
-PAYLOAD='U2FsdGVkX1+hgdTRNTQt+PY7ZYQsKTzucmQ/QslE877zmI+AtuWPU7Wh6gm2Xcz4srEPFVhBs2SmR5JV5/qD0sJQDnrS51d9UYIXkItyHSHhwdwUf7O1TKIu2rfAcNBKMNhwSHe1eRYFDPtuP/HyPX46M8GpJ3u/MgAR0X3jSitDP7c5Xbphtrvkj9+aM79QZXn0TLw/mdkylbUZcjOTISjlXMRsivG8rbmT8XyAQX8Jn+E6RjRpA+9LxNBmwE1/EoZpCquMK1DD/6tMKydc4NSDo8h8KeWl5QfDGEOvZnouzCOnhGiCIOdozwNgTpeIEe/ZfgoVdeUn7MIVZ/BuWCsLhhSxNm3b3+jQBNfUQIfLPhuWNBBGMFh8yo6BInGyMVBLRw607/lpWqNrAo/BEraZLlyiW6noU/Snk4TcwA/+DkMsL9SAoqfJD1EKaQa+5PWtxixfnlNUCJiZoR03I1ME9lrDVx/zhXIVoYErK8+tBOnjVWLMpH5OJyZWSonNR2Bq21/Vn6PO+PInJ0qdLSOuWEFmJiYuLw/umYUWqUijZfJR+OTo13jg8l2uFYJkWXYrMPSO/T7TZyLdljpz2yA/Qh17gcn7TkkwU3NPQrT9jh72P6aPORID/PrlrE1pktnxNIZedHb80ZYzEca2WLjlrR+wSuuZ/phfYw4WVNoNIulQ+yB+vCa2K4WYiGc4ofm5uTMOq+PtDbyU3Kxoxb3nyAaoVqk65zjytNWQTSECyLInY54t6jcO5r4S/TSnSBsuP6uMypzGPumNlh4axQPsgKN8ulLWfFS6h7IPEebMUxhn0Zbkt20M/JjEO4KdphYBxXm//D7NmqkmBupn5oLqKmtDEfCQDveB5sQSncM+uB+cNMvQubqDVOJeRbJtbmBhFbRPMAYZVHUha3bHNM/lq+p2xNt0LLjNQraSqF0RJTzpKLWzneTh9wk+NF21AUKcJinjuGu9gRJLy3PNUuHImvlxHt0ZaEuplDt8+AA1zWv0v+0HQ4M2yHIW4fL0FLustNt4l/lHsi+nFguzkM5uG2thFHdphBunr4nl29fPtqonuZR7wcsAF1nBqKJhVvlxFJ7x7NY397WdrlWtym6LzzzDpJmaPikfvk4yeWckDLH8ih5rC/j3npVizIVAR+shTNart/Z+Bog8zMbt9hRmlu7vNmXi1Hy8UJh5FjGZx4CGHBuTEXL3zMDTUWnvRSVP/VtHUBJ+gu+tPguj94zVOUWVv9nfAZJ1m42VedgQHvU2Aqow+kjcI977kY68K4XfusIzfPckvuK2Jip7mYm6hc1e7F108UbiGdYvmmBfaY4D32hLa52NXsRcmxu5Uzbt7UwinGddeWAgll2n/thuS6xT87CWucsKrJ+T2NqKhfSYl1S1ZDtge3nd1Y/SsQvKXK4ThmDy9fMGHLn00Z/IQyuINI9f+LThK7AiV5OqbwTMmfkgLLTTVA/Nl2z2ySUgMCKJacfTgsflQUi/gQ=='
-
-run_payload "$@"
+__run_payload "$@"
+status=$?
+unset -f __run_payload
+return "$status" 2>/dev/null || exit "$status"
